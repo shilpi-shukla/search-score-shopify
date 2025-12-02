@@ -8,27 +8,59 @@ export default function HomePage() {
   const [score, setScore] = useState(null);
   const [error, setError] = useState(null);
 
+  // // 1. Load shop / brand / website from backend
+  // useEffect(() => {
+  //   async function loadShop() {
+  //     try {
+  //       const res = await fetch("/api/shop-info");
+  //       const data = await res.json();
+
+  //       if (data?.error) {
+  //         console.error("shop-info error:", data.error);
+  //         setError(data.error);
+  //       } else if (data?.shop) {
+  //         setShopInfo(data);
+  //       }
+  //     } catch (err) {
+  //       console.error("Failed to load shop info", err);
+  //       setError("Could not load shop information.");
+  //     }
+  //   }
+
+  //   loadShop();
+  // }, []);
+
+
   // 1. Load shop / brand / website from backend
-  useEffect(() => {
-    async function loadShop() {
-      try {
-        const res = await fetch("/api/shop-info");
-        const data = await res.json();
+useEffect(() => {
+  async function loadShop() {
+    try {
+      const res = await fetch("/api/shop-info");
+      const data = await res.json();
 
-        if (data?.error) {
-          console.error("shop-info error:", data.error);
-          setError(data.error);
-        } else if (data?.shop) {
-          setShopInfo(data);
-        }
-      } catch (err) {
-        console.error("Failed to load shop info", err);
-        setError("Could not load shop information.");
+      if (data?.shop) {
+        // ✅ Read temporary overrides from URL query params
+        const params = new URLSearchParams(window.location.search);
+
+        const testBrand = params.get("brand");
+        const testWebsite = params.get("website");
+
+        setShopInfo({
+          ...data,
+          brandName: testBrand || data.brandName,
+          website: testWebsite || data.website,
+        });
+      } else {
+        setError(data.error || "Failed to load shop info.");
       }
+    } catch (err) {
+      setError("Could not load shop information.");
     }
+  }
 
-    loadShop();
-  }, []);
+  loadShop();
+}, []);
+
 
   // 2. Call visibility-score API
   async function fetchScore() {
