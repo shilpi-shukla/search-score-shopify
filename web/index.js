@@ -8,7 +8,7 @@ import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
 import PrivacyWebhookHandlers from "./privacy.js";
 import visibilityScoreRoute from "./api/visibility-score.js";
-import shopInfoRoute from "./api/shop-info.js";   // ★ ADD THIS
+import shopInfoRoute from "./api/shop-info.js";
 
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
@@ -22,9 +22,7 @@ const STATIC_PATH =
 
 const app = express();
 
-//
-// 1. SHOPIFY AUTH
-//
+// 1. AUTH
 app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
   shopify.config.auth.callbackPath,
@@ -32,33 +30,22 @@ app.get(
   shopify.redirectToShopifyOrAppRoot()
 );
 
-//
 // 2. WEBHOOKS
-//
 app.post(
   shopify.config.webhooks.path,
   shopify.processWebhooks({ webhookHandlers: PrivacyWebhookHandlers })
 );
 
-//
-// 3. JSON PARSING
-//
 app.use(express.json());
 
-//
-// 4. SECURE ALL API ROUTES
-//
+// 3. SECURE ALL /api ROUTES WITH SESSION
 app.use("/api/*", shopify.validateAuthenticatedSession());
 
-//
-// 5. OUR CUSTOM API ROUTES
-//
-app.use("/api/shop-info", shopInfoRoute);               // ★ FIXED
+// 4. APP API ROUTES
+app.use("/api/shop-info", shopInfoRoute);
 app.use("/api/visibility-score", visibilityScoreRoute);
 
-//
-// 6. EXAMPLE SHOPIFY PRODUCT ROUTES
-//
+// 5. SAMPLE SHOPIFY PRODUCT APIs (unchanged)
 app.get("/api/products/count", async (_req, res) => {
   const client = new shopify.api.clients.Graphql({
     session: res.locals.shopify.session,
@@ -76,26 +63,26 @@ app.get("/api/products/count", async (_req, res) => {
 });
 
 app.post("/api/products", async (_req, res) => {
+  let status = 200;
+  let error = null;
+
   try {
     await productCreator(res.locals.shopify.session);
-    res.status(200).send({ success: true });
   } catch (e) {
-    // @ts-ignore
-    res.status(500).send({ success: false, error: e.message });
+    const message = e instanceof Error ? e.message : String(e);
+    console.log(`Failed to process products/create: ${message}`);
+    status = 500;
+    error = message;
   }
+  res.status(status).send({ success: status === 200, error });
 });
 
-//
-// 7. STATIC FRONTEND
-//
+// 6. FRONTEND STATIC + APP SHELL
 app.use(shopify.cspHeaders());
 app.use(serveStatic(STATIC_PATH, { index: false }));
 
-//
-// 8. LOAD FRONTEND
-//
 app.use("/*", shopify.ensureInstalledOnShop(), async (_req, res) => {
-  res
+  return res
     .status(200)
     .set("Content-Type", "text/html")
     .send(
